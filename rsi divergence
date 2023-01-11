@@ -1,0 +1,99 @@
+//@version=5
+indicator(title="Divergence Indicator", format=format.price, timeframe="", timeframe_gaps=true)
+//strategy(title="Divergence Indicator")
+len = input.int(title="RSI Period", minval=1, defval=10)
+src = input(title="RSI Source", defval=close)
+lbR = input(title="Pivot Lookback Right", defval=5)
+lbL = input(title="Pivot Lookback Left", defval=5)
+rangeUpper = input(title="Max of Lookback Range", defval=60)
+rangeLower = input(title="Min of Lookback Range", defval=5)
+plotBull = input(title="Plot Bullish", defval=true)
+plotBear = input(title="Plot Bearish", defval=true)
+bearColor = color.red
+bullColor = color.green
+textColor = color.white
+noneColor = color.new(color.white, 100)
+osc = ta.rsi(src, len)
+atr= ta.atr(42)
+
+plot(osc, title="RSI", linewidth=2, color=#2962FF)
+hline(50, title="Middle Line", color=#787B86, linestyle=hline.style_dotted)
+obLevel = hline(75, title="Overbought", color=#787B86, linestyle=hline.style_dotted)
+osLevel = hline(25, title="Oversold", color=#787B86, linestyle=hline.style_dotted)
+fill(obLevel, osLevel, title="Background", color=color.rgb(33, 150, 243, 90))
+
+plFound = (na(ta.pivotlow(osc,lbL,lbR)) ? false : true) //and ta.pivotlow(osc,lbL,lbR) <25
+bgcolor(ta.pivotlow(osc,lbL,lbR)<25 ? color.new(color.green,70):na, offset = -lbR)
+phFound = (na(ta.pivothigh(osc,lbL,lbR)) ? false : true) //and ta.pivothigh(osc,lbL,lbR) >75
+bgcolor(ta.pivothigh(osc,lbL,lbR)>75 ? color.new(color.red,70):na, offset = -lbR)
+_inRange(cond) => // inrange라는 함수를 만든다
+	bars = ta.barssince(cond == true) //조건이 참일 때의 캔들의 수
+	rangeLower <= bars and bars <= rangeUpper //pivot_low 사이의 거리에 제한을 둔다. 너무 가까워서도 안되고 너무 멀어서도 안된다.
+
+
+
+//------------------------------------------------------------------------------
+// Regular Bullish
+// Osc: Higher Low
+
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1]) and ta.valuewhen(plFound,osc[lbR],1) <25
+
+// Price: Lower Low
+
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)// 조건이 만족할 때의 값을 최근 몇번째꺼까지 가져올수있다.
+bullCond = plotBull and priceLL and oscHL and plFound
+
+plot(
+     plFound ? osc[lbR] : na,
+     offset=-lbR,
+     title="Regular Bullish",
+     linewidth=2,
+     color=(bullCond ? bullColor : noneColor)
+     )
+
+plotshape(
+	 bullCond ? osc[lbR] : na,
+	 offset=-lbR,
+	 title="Regular Bullish Label",
+	 text=" Bull ",
+	 style=shape.labelup,
+	 location=location.absolute,
+	 color=bullColor,
+	 textcolor=textColor
+	 )
+
+
+//------------------------------------------------------------------------------
+// Regular Bearish
+// Osc: Lower High
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])and ta.pivothigh(osc,lbL,lbR) >75
+
+// Price: Higher High
+
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
+
+bearCond = plotBear and priceHH and oscLH and phFound
+bc = oscLH and priceHH and phFound
+
+plot(
+	 phFound ? osc[lbR] : na,
+	 offset=-lbR,
+	 title="Regular Bearish",
+	 linewidth=2,
+	 color=(bearCond ? bearColor : noneColor)
+	 )
+
+plotshape(
+	 bearCond ? osc[lbR] : na,
+	 offset=-lbR,
+	 title="Regular Bearish Label",
+	 text=" Bear ",
+	 style=shape.labeldown,
+	 location=location.absolute,
+	 color=bearColor,
+	 textcolor=textColor
+	 )
+//strategy.entry("long",strategy.long,when=bullCond)
+//strategy.exit("exit long","long",stop=strategy.position_avg_price*0.97)
+//if bc
+//    strategy.close("long", qty_percent = 100/(4-strategy.closedtrades%4))
